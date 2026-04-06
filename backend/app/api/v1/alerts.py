@@ -10,6 +10,7 @@ from app.core.permissions import require_operator
 from app.database import get_db
 from app.models.alert import Alert, AlertRule, AlertStatus, AlertSeverity
 from app.models.user import User
+from app.api.v1.audit import log_audit
 from app.schemas.alert import AlertResponse, AlertRuleCreate, AlertRuleUpdate, AlertRuleResponse
 
 router = APIRouter()
@@ -54,6 +55,7 @@ async def acknowledge_alert(alert_id: uuid.UUID, db: AsyncSession = Depends(get_
     alert.status = "acknowledged"
     alert.acknowledged_at = datetime.now(timezone.utc)
     alert.acknowledged_by = user.username
+    await log_audit(db, user.id, user.username, "acknowledge_alert", "alert", str(alert_id), f"Acknowledged alert: {alert.title}")
     await db.commit()
     await db.refresh(alert)
     return alert
@@ -67,6 +69,7 @@ async def resolve_alert(alert_id: uuid.UUID, db: AsyncSession = Depends(get_db),
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert not found")
     alert.status = "resolved"
     alert.resolved_at = datetime.now(timezone.utc)
+    await log_audit(db, user.id, user.username, "resolve_alert", "alert", str(alert_id), f"Resolved alert: {alert.title}")
     await db.commit()
     await db.refresh(alert)
     return alert

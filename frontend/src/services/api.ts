@@ -46,6 +46,7 @@ export const fetchCurrentMetrics = () => api.get('/metrics/current')
 export const fetchMetricHistory = (params: Record<string, string>) => api.get('/metrics/history', { params })
 export const fetchTopN = (metricName: string, n: number) =>
   api.get('/metrics/top-n', { params: { metric_name: metricName, n } })
+export const fetchTrafficSummary = () => api.get('/metrics/traffic-summary')
 
 // Alerts
 export const fetchAlerts = (params?: Record<string, string>) => api.get('/alerts/', { params })
@@ -53,6 +54,9 @@ export const fetchActiveAlerts = () => api.get('/alerts/active')
 export const acknowledgeAlert = (id: string) => api.put(`/alerts/${id}/acknowledge`)
 export const resolveAlert = (id: string) => api.put(`/alerts/${id}/resolve`)
 export const fetchAlertRules = () => api.get('/alerts/rules')
+export const createAlertRule = (data: Record<string, unknown>) => api.post('/alerts/rules', data)
+export const updateAlertRule = (id: string, data: Record<string, unknown>) => api.put(`/alerts/rules/${id}`, data)
+export const deleteAlertRule = (id: string) => api.delete(`/alerts/rules/${id}`)
 
 // Dashboard
 export const fetchDashboardSummary = () => api.get('/dashboard/summary')
@@ -71,3 +75,6 @@ export const aiChat = (message: string) => api.post('/ai/chat', { message })
 // Reports
 export const generateReport = (data: Record<string, string>) => api.post('/reports/generate', data)
 export const fetchReports = () => api.get('/reports/')
+
+// Audit
+export const fetchAuditLogs = (params?: Record<string, string>) => api.get('/audit/', { params })

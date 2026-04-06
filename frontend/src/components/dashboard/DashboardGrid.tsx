@@ -68,7 +68,7 @@ export default function DashboardGrid() {
       {/* Row 2: Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <TrafficChart data={allMetrics} />
-        <NetworkMap nodes={[]} />
+        <NetworkMap items={statusMatrix?.items ?? []} />
       </div>
 
       {/* Row 3: Heatmap placeholder */}

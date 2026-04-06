@@ -87,6 +87,17 @@ export interface DashboardSummary {
   warning_alerts: number
 }
 
+export interface TrafficSummary {
+  asset_id: string
+  asset_name: string
+  asset_type: string
+  location: string
+  avg_network_in: number
+  avg_network_out: number
+  max_network_in: number
+  max_network_out: number
+}
+
 export interface DiagnosisResult {
   diagnosis_id: string
   asset_id: string

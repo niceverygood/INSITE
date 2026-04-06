@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select, func
 
 from app.config import get_settings
-from app.api.v1 import assets, metrics, alerts, logs, dashboard, reports, ai_diagnosis, auth
+from app.api.v1 import assets, metrics, alerts, logs, dashboard, reports, ai_diagnosis, auth, audit
 import app.models  # noqa: F401
 
 settings = get_settings()
@@ -74,6 +74,7 @@ app.include_router(logs.router, prefix="/api/v1/logs", tags=["Logs"])
 app.include_router(dashboard.router, prefix="/api/v1/dashboard", tags=["Dashboard"])
 app.include_router(reports.router, prefix="/api/v1/reports", tags=["Reports"])
 app.include_router(ai_diagnosis.router, prefix="/api/v1/ai", tags=["AI Diagnosis"])
+app.include_router(audit.router, prefix="/api/v1/audit", tags=["Audit"])
 
 
 @app.get("/health")

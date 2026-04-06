@@ -8,6 +8,7 @@ from app.core.auth import get_current_user
 from app.core.security import verify_password, hash_password, create_access_token, create_refresh_token, decode_token
 from app.database import get_db
 from app.models.user import User
+from app.api.v1.audit import log_audit
 from app.schemas.user import LoginRequest, TokenResponse, UserCreate, UserResponse
 
 router = APIRouter()
@@ -23,6 +24,7 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User inactive")
 
     user.last_login = datetime.now(timezone.utc)
+    await log_audit(db, user.id, user.username, "login", "user", str(user.id), "User logged in")
     await db.commit()
 
     access_token = create_access_token({"sub": str(user.id), "role": user.role})
