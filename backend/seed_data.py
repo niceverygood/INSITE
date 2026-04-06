@@ -1,5 +1,6 @@
 """Seed realistic dummy data for INSITE demo."""
 import asyncio
+import json
 import random
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -170,15 +171,18 @@ async def seed(skip_create_tables: bool = False):
 
         # Assets
         asset_ids = {}
-        for a in ASSETS:
+        for idx, a in enumerate(ASSETS):
+            mac = f"00:1A:2B:{idx:02X}:{random.randint(0,255):02X}:{random.randint(0,255):02X}"
             asset = Asset(
                 id=uuid.uuid4(),
                 asset_type=a["asset_type"],
                 name=a["name"],
                 ip_address=a["ip_address"],
+                mac_address=mac,
                 location=a["location"],
                 status="down" if a["status"] == "critical" else a["status"],
                 last_heartbeat=now - timedelta(seconds=random.randint(5, 60)) if a["status"] != "critical" else now - timedelta(hours=2),
+                extra_info=json.loads(a.get("extra_info", "null")),
             )
             db.add(asset)
             asset_ids[a["name"]] = asset.id
