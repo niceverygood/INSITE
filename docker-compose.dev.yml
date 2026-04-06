@@ -1,0 +1,21 @@
+version: "3.9"
+
+# Development overrides — use with:
+# docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  backend:
+    build:
+      target: development
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    environment:
+      APP_ENV: development
+      APP_DEBUG: "true"
+
+  frontend:
+    command: npm run dev -- --host 0.0.0.0
+    environment:
+      NODE_ENV: development
+
+  collector:
+    command: python -u agent.py --debug

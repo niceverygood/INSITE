@@ -1,0 +1,19 @@
+collector:
+  poll_interval: 15
+  heartbeat_interval: 10
+  snmp_interval: 30
+  syslog_port: 514
+
+kafka:
+  bootstrap_servers: "kafka:9092"
+  topics:
+    metrics: "metrics.raw"
+    alerts: "alerts.trigger"
+    status: "asset.status"
+    logs: "logs.ingest"
+
+snmp:
+  community: "public"
+  version: "2c"
+  timeout: 5
+  retries: 3
