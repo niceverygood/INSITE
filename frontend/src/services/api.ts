@@ -19,19 +19,21 @@ api.interceptors.response.use(
   (res) => res,
   async (err) => {
     const originalRequest = err.config
-    // On 401, retry once (Vercel cold start may cause transient auth failures)
-    if (err.response?.status === 401 && !originalRequest._retry) {
+    const status = err.response?.status
+
+    // Only handle explicit 401 from auth endpoints — never auto-logout on other errors
+    if (status === 401 && !originalRequest._retry) {
       originalRequest._retry = true
+      // If this is NOT a login request and we have a token, retry once after delay
       const token = localStorage.getItem('access_token')
       if (token && !originalRequest.url?.includes('/auth/login')) {
-        // Wait a moment for cold start to finish, then retry
-        await new Promise((r) => setTimeout(r, 2000))
+        await new Promise((r) => setTimeout(r, 3000))
         return api(originalRequest)
       }
-      localStorage.removeItem('access_token')
-      localStorage.removeItem('refresh_token')
-      if (!window.location.pathname.includes('/login')) {
-        window.location.href = '/login'
+      // Only clear auth if login itself returned 401 (wrong credentials)
+      if (originalRequest.url?.includes('/auth/login')) {
+        localStorage.removeItem('access_token')
+        localStorage.removeItem('refresh_token')
       }
     }
     return Promise.reject(err)
