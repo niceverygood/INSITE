@@ -152,14 +152,14 @@ def clamp(v: float, lo: float = 0.0, hi: float = 100.0) -> float:
     return max(lo, min(hi, v))
 
 
-async def seed():
-    # Create tables
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-        await conn.run_sync(Base.metadata.create_all)
-    async with timescale_engine.begin() as conn:
-        await conn.run_sync(TimescaleBase.metadata.drop_all)
-        await conn.run_sync(TimescaleBase.metadata.create_all)
+async def seed(skip_create_tables: bool = False):
+    if not skip_create_tables:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.drop_all)
+            await conn.run_sync(Base.metadata.create_all)
+        async with timescale_engine.begin() as conn:
+            await conn.run_sync(TimescaleBase.metadata.drop_all)
+            await conn.run_sync(TimescaleBase.metadata.create_all)
 
     async with AsyncSessionLocal() as db:
         # Users

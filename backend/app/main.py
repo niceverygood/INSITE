@@ -2,12 +2,34 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import select, func
 
 from app.config import get_settings
 from app.api.v1 import assets, metrics, alerts, logs, dashboard, reports, ai_diagnosis, auth
-import app.models  # noqa: F401 — ensure all models are imported for metadata
+import app.models  # noqa: F401
 
 settings = get_settings()
+
+
+async def _auto_seed():
+    """Seed demo data if the database is empty (e.g., Vercel cold start)."""
+    from app.database import AsyncSessionLocal
+    from app.models.user import User
+
+    async with AsyncSessionLocal() as db:
+        count = await db.execute(select(func.count(User.id)))
+        if count.scalar() > 0:
+            return  # Already seeded
+
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info("Empty database detected — seeding demo data...")
+
+    import sys, os
+    sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+    from seed_data import seed
+    await seed(skip_create_tables=True)
+    logger.info("Demo data seeded successfully")
 
 
 @asynccontextmanager
@@ -17,6 +39,7 @@ async def lifespan(app: FastAPI):
         await conn.run_sync(Base.metadata.create_all)
     async with timescale_engine.begin() as conn:
         await conn.run_sync(TimescaleBase.metadata.create_all)
+    await _auto_seed()
     yield
 
 
