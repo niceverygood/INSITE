@@ -21,14 +21,21 @@ async def _auto_seed():
         if count.scalar() > 0:
             return  # Already seeded
 
-    import logging
+    import logging, os
     logger = logging.getLogger(__name__)
     logger.info("Empty database detected — seeding demo data...")
 
-    import sys, os
+    import sys
     sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-    from seed_data import seed
-    await seed(skip_create_tables=True)
+
+    if os.environ.get("VERCEL"):
+        # Lightweight seed for serverless cold start (~2s)
+        from seed_lite import seed_lite
+        await seed_lite()
+    else:
+        from seed_data import seed
+        await seed(skip_create_tables=True)
+
     logger.info("Demo data seeded successfully")
 
 
