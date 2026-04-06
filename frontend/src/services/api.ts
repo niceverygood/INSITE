@@ -1,6 +1,7 @@
 import axios from 'axios'
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '/_/backend'
+const envBase = import.meta.env.VITE_API_BASE_URL
+const API_BASE = envBase !== undefined && envBase !== '' ? envBase : (import.meta.env.DEV ? '' : '/_/backend')
 
 const api = axios.create({
   baseURL: `${API_BASE}/api/v1`,
@@ -66,6 +67,7 @@ export const fetchLogStats = () => api.get('/logs/stats')
 export const requestDiagnosis = (assetId: string, symptom?: string) =>
   api.post('/ai/diagnose', { asset_id: assetId, symptom })
 export const fetchPredictions = () => api.get('/ai/predictions')
+export const aiChat = (message: string) => api.post('/ai/chat', { message })
 
 // Reports
 export const generateReport = (data: Record<string, string>) => api.post('/reports/generate', data)

@@ -47,8 +47,9 @@ class Settings(BaseSettings):
     # AI
     openai_api_key: str = ""
     anthropic_api_key: str = ""
-    ai_provider: str = "openai"
-    ai_model: str = "gpt-4o"
+    openrouter_api_key: str = ""
+    ai_provider: str = "openrouter"
+    ai_model: str = "anthropic/claude-sonnet-4"
 
     # SMTP
     smtp_host: str = "smtp.gmail.com"

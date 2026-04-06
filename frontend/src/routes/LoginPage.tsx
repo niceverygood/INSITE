@@ -2,7 +2,13 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { login } from '@/services/api'
 import { useAuthStore } from '@/stores/authStore'
-import { Activity } from 'lucide-react'
+import { Activity, Shield, Eye, Settings } from 'lucide-react'
+
+const TEST_ACCOUNTS = [
+  { username: 'admin', password: 'admin123', role: 'admin', label: '관리자', icon: Shield, color: 'from-red-500 to-orange-500' },
+  { username: 'operator', password: 'oper123', role: 'operator', label: '운영자', icon: Settings, color: 'from-blue-500 to-cyan-500' },
+  { username: 'viewer', password: 'view123', role: 'viewer', label: '뷰어', icon: Eye, color: 'from-green-500 to-emerald-500' },
+]
 
 export default function LoginPage() {
   const [username, setUsername] = useState('')
@@ -12,19 +18,23 @@ export default function LoginPage() {
   const navigate = useNavigate()
   const { setAuth } = useAuthStore()
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const doLogin = async (user: string, pass: string) => {
     setError('')
     setLoading(true)
     try {
-      const res = await login(username, password)
-      setAuth({ id: '', username, email: '', role: 'viewer', is_active: true }, res.data.access_token, res.data.refresh_token)
+      const res = await login(user, pass)
+      setAuth({ id: '', username: user, email: '', role: 'viewer', is_active: true }, res.data.access_token, res.data.refresh_token)
       navigate('/dashboard')
     } catch {
       setError('아이디 또는 비밀번호가 올바르지 않습니다')
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    doLogin(username, password)
   }
 
   return (
@@ -67,6 +77,27 @@ export default function LoginPage() {
             {loading ? '로그인 중...' : '로그인'}
           </button>
         </form>
+
+        {/* Test account quick login */}
+        <div className="mt-6 pt-5 border-t border-gray-700">
+          <p className="text-[11px] text-gray-500 text-center mb-3">테스트 계정으로 빠른 로그인</p>
+          <div className="grid grid-cols-3 gap-2">
+            {TEST_ACCOUNTS.map((acc) => (
+              <button
+                key={acc.username}
+                onClick={() => doLogin(acc.username, acc.password)}
+                disabled={loading}
+                className="group relative flex flex-col items-center gap-1.5 bg-gray-900 hover:bg-gray-750 border border-gray-700 hover:border-gray-500 rounded-xl py-3 px-2 transition-all disabled:opacity-40"
+              >
+                <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${acc.color} flex items-center justify-center shadow-lg`}>
+                  <acc.icon className="h-4 w-4 text-white" />
+                </div>
+                <span className="text-[11px] font-medium text-gray-300 group-hover:text-white">{acc.label}</span>
+                <span className="text-[10px] text-gray-500">{acc.username}</span>
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   )

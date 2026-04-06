@@ -19,19 +19,27 @@ class DiagnosisCause(BaseModel):
 
 
 class DiagnosisResponse(BaseModel):
-    diagnosis_id: uuid.UUID
-    asset_id: uuid.UUID
-    timestamp: datetime
+    diagnosis_id: str
+    asset_id: str
+    timestamp: str
     causes: list[DiagnosisCause]
     severity_score: int
     summary: str
 
 
+class ChatRequest(BaseModel):
+    message: str
+
+
+class ChatResponse(BaseModel):
+    message: str
+
+
 class PredictionResponse(BaseModel):
-    asset_id: uuid.UUID
+    asset_id: str
     asset_name: str
     metric_name: str
     current_value: float
-    predicted_exhaustion: datetime | None
-    days_remaining: float | None
+    predicted_hours: float
+    days_remaining: float
     severity: str
