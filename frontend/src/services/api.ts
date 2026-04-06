@@ -1,7 +1,6 @@
 import axios from 'axios'
 
-const envBase = import.meta.env.VITE_API_BASE_URL
-const API_BASE = envBase !== undefined && envBase !== '' ? envBase : (import.meta.env.DEV ? '' : '/_/backend')
+const API_BASE = ''
 
 const api = axios.create({
   baseURL: `${API_BASE}/api/v1`,
