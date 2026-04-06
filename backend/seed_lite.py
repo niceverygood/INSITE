@@ -120,16 +120,16 @@ async def seed_lite():
 
         await db.commit()
 
-    # Metrics — only 2 hours, 5-min intervals = 24 points per asset (lightweight)
+    # Metrics — 1 hour, 5-min intervals = 12 points per asset (very lightweight)
     async with TimescaleSessionLocal() as db:
         for a in ASSETS:
             aid = asset_ids[a["name"]]
             prefix = a["name"].split("-")[0]
             cpu_base, mem_base, disk_base = OVERRIDES.get(a["name"], PROFILES.get(prefix, (30, 50, 40)))
 
-            for i in range(24):
-                t = now - timedelta(minutes=(23 - i) * 5)
-                is_down = a["name"] == "K8S-WORKER-03" and i > 20
+            for i in range(12):
+                t = now - timedelta(minutes=(11 - i) * 5)
+                is_down = a["name"] == "K8S-WORKER-03" and i > 10
                 db.add(Metric(time=t, asset_id=aid, metric_name="cpu_usage",
                               value=0 if is_down else round(clamp(random.gauss(cpu_base, 5)), 1), unit="%"))
                 db.add(Metric(time=t, asset_id=aid, metric_name="memory_usage",

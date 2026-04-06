@@ -18,10 +18,21 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (res) => res,
   async (err) => {
-    if (err.response?.status === 401) {
+    const originalRequest = err.config
+    // On 401, retry once (Vercel cold start may cause transient auth failures)
+    if (err.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true
+      const token = localStorage.getItem('access_token')
+      if (token && !originalRequest.url?.includes('/auth/login')) {
+        // Wait a moment for cold start to finish, then retry
+        await new Promise((r) => setTimeout(r, 2000))
+        return api(originalRequest)
+      }
       localStorage.removeItem('access_token')
       localStorage.removeItem('refresh_token')
-      window.location.href = '/login'
+      if (!window.location.pathname.includes('/login')) {
+        window.location.href = '/login'
+      }
     }
     return Promise.reject(err)
   },
