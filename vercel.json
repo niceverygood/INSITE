@@ -1,7 +1,5 @@
 {
-  "buildCommand": "cd frontend && npm install && npm run build",
-  "outputDirectory": "frontend/dist",
-  "framework": null,
+  "buildCommand": "cd frontend && npm install && npm run build && mkdir -p ../public && cp -r dist/* ../public/",
   "functions": {
     "api/**/*.py": {
       "maxDuration": 30
@@ -11,6 +9,6 @@
     { "src": "/api/(.*)", "dest": "/api/[...path].py" },
     { "src": "/health", "dest": "/api/[...path].py" },
     { "handle": "filesystem" },
-    { "src": "/(.*)", "dest": "/index.html" }
+    { "src": "/(.*)", "dest": "/public/index.html" }
   ]
 }
