@@ -1,8 +1,8 @@
 {
-  "buildCommand": "cd frontend && npm install && npm run build && cp -r dist/. ../public/",
+  "buildCommand": "cd frontend && npm install && npm run build && cp -r dist/. ../public/ && mv ../public/index.html ../public/app.html",
   "rewrites": [
     { "source": "/api/v1/(.*)", "destination": "/api" },
     { "source": "/health", "destination": "/api" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/((?!assets|vite).*)", "destination": "/app.html" }
   ]
 }
