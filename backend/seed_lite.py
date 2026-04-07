@@ -101,11 +101,14 @@ async def seed_lite():
 
         # Alert rules
         rules = [
-            {"name": "CPU Critical", "metric_name": "cpu_usage", "condition": "gt", "threshold": 90.0, "duration_seconds": 300, "severity": "critical"},
-            {"name": "Memory Critical", "metric_name": "memory_usage", "condition": "gt", "threshold": 95.0, "duration_seconds": 0, "severity": "critical"},
-            {"name": "Disk Critical", "metric_name": "disk_usage", "condition": "gt", "threshold": 90.0, "duration_seconds": 0, "severity": "critical"},
-            {"name": "CPU Warning", "metric_name": "cpu_usage", "condition": "gt", "threshold": 70.0, "duration_seconds": 600, "severity": "warning"},
-            {"name": "Heartbeat Fail", "metric_name": "heartbeat", "condition": "eq", "threshold": 0.0, "duration_seconds": 30, "severity": "critical"},
+            {"name": "CPU Critical (>90%, 5min)", "metric_name": "cpu_usage", "condition": "gt", "threshold": 90.0, "duration_seconds": 300, "severity": "critical"},
+            {"name": "CPU Warning (>70%, 10min)", "metric_name": "cpu_usage", "condition": "gt", "threshold": 70.0, "duration_seconds": 600, "severity": "warning"},
+            {"name": "Memory Critical (>95%)", "metric_name": "memory_usage", "condition": "gt", "threshold": 95.0, "duration_seconds": 0, "severity": "critical"},
+            {"name": "Memory Warning (>85%)", "metric_name": "memory_usage", "condition": "gt", "threshold": 85.0, "duration_seconds": 0, "severity": "warning"},
+            {"name": "Disk Critical (>90%)", "metric_name": "disk_usage", "condition": "gt", "threshold": 90.0, "duration_seconds": 0, "severity": "critical"},
+            {"name": "Disk Warning (>80%)", "metric_name": "disk_usage", "condition": "gt", "threshold": 80.0, "duration_seconds": 0, "severity": "warning"},
+            {"name": "Packet Loss (>5%)", "metric_name": "packet_loss", "condition": "gt", "threshold": 5.0, "duration_seconds": 60, "severity": "warning"},
+            {"name": "Heartbeat Failure", "metric_name": "heartbeat", "condition": "eq", "threshold": 0.0, "duration_seconds": 30, "severity": "critical"},
         ]
         rule_ids = {}
         for r in rules:
@@ -113,20 +116,64 @@ async def seed_lite():
             db.add(rule)
             rule_ids[r["name"]] = rule.id
 
-        # Alerts
+        # Alerts — mix of firing, acknowledged, resolved for realistic view
         alerts = [
-            {"asset": "DB-PRD-03", "rule": "CPU Critical", "sev": "critical", "title": "DB-PRD-03 CPU 95% 초과", "msg": "CPU 사용률이 95%를 초과했습니다.", "status": "firing", "ago": 45},
-            {"asset": "DB-PRD-03", "rule": "Memory Critical", "sev": "critical", "title": "DB-PRD-03 메모리 96%", "msg": "메모리 사용률 96%. OOM 위험.", "status": "firing", "ago": 40},
-            {"asset": "DB-PRD-03", "rule": "Disk Critical", "sev": "critical", "title": "DB-PRD-03 디스크 93%", "msg": "디스크 /data 93%. 긴급 정리 필요.", "status": "firing", "ago": 120},
-            {"asset": "K8S-WORKER-03", "rule": "Heartbeat Fail", "sev": "critical", "title": "K8S-WORKER-03 응답 없음", "msg": "워커 노드 2시간 전부터 응답 없음.", "status": "firing", "ago": 130},
-            {"asset": "WEB-PRD-03", "rule": "CPU Warning", "sev": "warning", "title": "WEB-PRD-03 CPU 82%", "msg": "CPU 사용률 높음. 트래픽 분산 확인.", "status": "firing", "ago": 25},
-            {"asset": "KAFKA-PRD-03", "rule": "CPU Warning", "sev": "warning", "title": "KAFKA-PRD-03 CPU 78%", "msg": "Consumer lag 확인 필요.", "status": "firing", "ago": 15},
-            {"asset": "DIST-SW-B2", "rule": "CPU Warning", "sev": "warning", "title": "DIST-SW-B2 트래픽 과부하", "msg": "포트 트래픽 임계치 초과.", "status": "firing", "ago": 8},
+            # Active critical alerts
+            {"asset": "DB-PRD-03", "rule": "CPU Critical (>90%, 5min)", "sev": "critical",
+             "title": "DB-PRD-03 CPU 95% 초과", "msg": "CPU 사용률이 95%를 5분 이상 초과했습니다. 즉시 확인 필요.",
+             "status": "firing", "ago": 45},
+            {"asset": "DB-PRD-03", "rule": "Memory Critical (>95%)", "sev": "critical",
+             "title": "DB-PRD-03 메모리 96%", "msg": "메모리 사용률 96%. OOM 위험. 프로세스 정리 또는 증설 필요.",
+             "status": "firing", "ago": 40},
+            {"asset": "DB-PRD-03", "rule": "Disk Critical (>90%)", "sev": "critical",
+             "title": "DB-PRD-03 디스크 93%", "msg": "디스크 /data 93%. 긴급 정리 필요. 예상 포화 시간: 6시간.",
+             "status": "firing", "ago": 120},
+            {"asset": "K8S-WORKER-03", "rule": "Heartbeat Failure", "sev": "critical",
+             "title": "K8S-WORKER-03 응답 없음", "msg": "워커 노드 2시간 전부터 Heartbeat 응답 없음. 노드 상태 확인 필요.",
+             "status": "firing", "ago": 130},
+            # Active warnings
+            {"asset": "WEB-PRD-03", "rule": "CPU Warning (>70%, 10min)", "sev": "warning",
+             "title": "WEB-PRD-03 CPU 82%", "msg": "CPU 사용률 높음. 트래픽 분산 또는 스케일아웃 확인.",
+             "status": "firing", "ago": 25},
+            {"asset": "KAFKA-PRD-03", "rule": "CPU Warning (>70%, 10min)", "sev": "warning",
+             "title": "KAFKA-PRD-03 CPU 78%", "msg": "Consumer lag 증가 추세. 파티션 리밸런싱 확인 필요.",
+             "status": "firing", "ago": 15},
+            {"asset": "DIST-SW-B2", "rule": "Packet Loss (>5%)", "sev": "warning",
+             "title": "DIST-SW-B2 트래픽 과부하", "msg": "포트 Gi0/24 트래픽 임계치 초과. 패킷 로스 7.2%.",
+             "status": "firing", "ago": 8},
+            {"asset": "CACHE-PRD-01", "rule": "Memory Warning (>85%)", "sev": "warning",
+             "title": "CACHE-PRD-01 메모리 87%", "msg": "Redis 메모리 사용 87%. maxmemory 정책 확인.",
+             "status": "firing", "ago": 55},
+            # Acknowledged alerts
+            {"asset": "ES-PRD-01", "rule": "Disk Warning (>80%)", "sev": "warning",
+             "title": "ES-PRD-01 디스크 83%", "msg": "Elasticsearch 인덱스 정리 작업 예정.",
+             "status": "acknowledged", "ago": 180},
+            {"asset": "WEB-PRD-02", "rule": "CPU Warning (>70%, 10min)", "sev": "warning",
+             "title": "WEB-PRD-02 CPU 간헐적 75%", "msg": "배치 작업 시간대 일시적 증가. 모니터링 중.",
+             "status": "acknowledged", "ago": 95},
+            # Resolved alerts
+            {"asset": "API-PRD-01", "rule": "CPU Critical (>90%, 5min)", "sev": "critical",
+             "title": "API-PRD-01 CPU 92% 스파이크", "msg": "대량 API 요청으로 인한 일시적 CPU 급증. 오토스케일 대응 완료.",
+             "status": "resolved", "ago": 360},
+            {"asset": "DB-PRD-01", "rule": "Memory Warning (>85%)", "sev": "warning",
+             "title": "DB-PRD-01 메모리 88%", "msg": "쿼리 캐시 정리 후 정상화.",
+             "status": "resolved", "ago": 480},
+            {"asset": "CORE-SW-01", "rule": "Packet Loss (>5%)", "sev": "warning",
+             "title": "CORE-SW-01 패킷 로스 6%", "msg": "포트 플랩 감지. 케이블 교체 후 정상.",
+             "status": "resolved", "ago": 720},
         ]
         for ad in alerts:
-            db.add(Alert(id=uuid.uuid4(), asset_id=asset_ids[ad["asset"]], rule_id=rule_ids[ad["rule"]],
-                         severity=ad["sev"], title=ad["title"], message=ad["msg"], status=ad["status"],
-                         fired_at=now - timedelta(minutes=ad["ago"]), notification_sent=True))
+            alert = Alert(id=uuid.uuid4(), asset_id=asset_ids[ad["asset"]], rule_id=rule_ids[ad["rule"]],
+                          severity=ad["sev"], title=ad["title"], message=ad["msg"], status=ad["status"],
+                          fired_at=now - timedelta(minutes=ad["ago"]), notification_sent=True)
+            if ad["status"] == "acknowledged":
+                alert.acknowledged_at = now - timedelta(minutes=ad["ago"] - 10)
+                alert.acknowledged_by = "operator"
+            elif ad["status"] == "resolved":
+                alert.acknowledged_at = now - timedelta(minutes=ad["ago"] - 5)
+                alert.acknowledged_by = "operator"
+                alert.resolved_at = now - timedelta(minutes=ad["ago"] - 30)
+            db.add(alert)
 
         # Logs (30 entries — lightweight)
         log_msgs = [

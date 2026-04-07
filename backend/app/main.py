@@ -1,4 +1,7 @@
 from contextlib import asynccontextmanager
+import logging
+import os
+import sys
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,43 +12,59 @@ from app.api.v1 import assets, metrics, alerts, logs, dashboard, reports, ai_dia
 import app.models  # noqa: F401
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
+
+_seeded = False
 
 
-async def _auto_seed():
-    """Seed demo data if the database is empty (e.g., Vercel cold start)."""
-    from app.database import AsyncSessionLocal
-    from app.models.user import User
-
-    async with AsyncSessionLocal() as db:
-        count = await db.execute(select(func.count(User.id)))
-        if count.scalar() > 0:
-            return  # Already seeded
-
-    import logging, os
-    logger = logging.getLogger(__name__)
-    logger.info("Empty database detected — seeding demo data...")
-
-    import sys
-    sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-
-    if os.environ.get("VERCEL"):
-        # Lightweight seed for serverless cold start (~2s)
-        from seed_lite import seed_lite
-        await seed_lite()
-    else:
-        from seed_data import seed
-        await seed(skip_create_tables=True)
-
-    logger.info("Demo data seeded successfully")
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
+async def _ensure_tables():
+    """Create database tables if they don't exist."""
     from app.database import engine, timescale_engine, Base, TimescaleBase
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     async with timescale_engine.begin() as conn:
         await conn.run_sync(TimescaleBase.metadata.create_all)
+
+
+async def _auto_seed():
+    """Seed demo data if the database is empty (e.g., Vercel cold start)."""
+    global _seeded
+    if _seeded:
+        return
+
+    from app.database import AsyncSessionLocal
+    from app.models.user import User
+
+    try:
+        async with AsyncSessionLocal() as db:
+            count = await db.execute(select(func.count(User.id)))
+            if count.scalar() > 0:
+                _seeded = True
+                return  # Already seeded
+    except Exception:
+        # Table might not exist yet
+        await _ensure_tables()
+
+    logger.info("Empty database detected — seeding demo data...")
+
+    sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+
+    try:
+        if os.environ.get("VERCEL"):
+            from seed_lite import seed_lite
+            await seed_lite()
+        else:
+            from seed_data import seed
+            await seed(skip_create_tables=True)
+        _seeded = True
+        logger.info("Demo data seeded successfully")
+    except Exception as e:
+        logger.error(f"Seed failed: {e}", exc_info=True)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await _ensure_tables()
     await _auto_seed()
     yield
 
@@ -64,6 +83,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def ensure_seed_middleware(request, call_next):
+    """Safety net: ensure tables + seed exist even if lifespan didn't fire."""
+    if not _seeded:
+        await _ensure_tables()
+        await _auto_seed()
+    return await call_next(request)
+
 
 # API routers
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Auth"])

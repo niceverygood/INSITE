@@ -52,7 +52,7 @@ async def list_assets(
 async def get_topology(db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
     result = await db.execute(select(Asset).where(Asset.asset_type == AssetType.network_device))
     devices = result.scalars().all()
-    nodes = [{"id": str(d.id), "name": d.name, "ip": d.ip_address, "status": d.status.value, "x": d.floor_map_x, "y": d.floor_map_y} for d in devices]
+    nodes = [{"id": str(d.id), "name": d.name, "ip": d.ip_address, "status": d.status if isinstance(d.status, str) else d.status.value, "x": d.floor_map_x, "y": d.floor_map_y} for d in devices]
     return {"nodes": nodes, "links": []}
 
 
