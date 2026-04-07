@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { fetchReports, generateReport } from '@/services/api'
 import { FileText, Download, Calendar, FileSpreadsheet, File, Clock } from 'lucide-react'
+import { DEMO_REPORTS } from '@/data/demo'
 
 const typeColors: Record<string, string> = {
   '일간': 'bg-blue-500/20 text-blue-400',
@@ -14,10 +15,11 @@ export default function ReportsPage() {
   const [format, setFormat] = useState('pdf')
   const queryClient = useQueryClient()
 
-  const { data: reports } = useQuery({
+  const { data: apiReports } = useQuery({
     queryKey: ['reports'],
     queryFn: async () => (await fetchReports()).data,
   })
+  const reports = apiReports?.length ? apiReports : DEMO_REPORTS
 
   const generateMutation = useMutation({
     mutationFn: () => generateReport({ report_type: reportType, format }),
