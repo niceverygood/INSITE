@@ -1,4 +1,5 @@
 import os
+import ssl as _ssl
 
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
@@ -13,6 +14,11 @@ if DATABASE_URL:
     elif DATABASE_URL.startswith("postgres://"):
         DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+asyncpg://", 1)
 
+    # Supabase requires SSL — create a permissive SSL context for asyncpg
+    ssl_ctx = _ssl.create_default_context()
+    ssl_ctx.check_hostname = False
+    ssl_ctx.verify_mode = _ssl.CERT_NONE
+
     engine = create_async_engine(
         DATABASE_URL,
         echo=False,
@@ -20,6 +26,7 @@ if DATABASE_URL:
         max_overflow=10,
         pool_pre_ping=True,
         pool_recycle=300,
+        connect_args={"ssl": ssl_ctx},
     )
     # Use same Supabase DB for metrics (no separate TimescaleDB needed)
     timescale_engine = engine
