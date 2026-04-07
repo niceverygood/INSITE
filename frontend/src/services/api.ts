@@ -155,13 +155,14 @@ export const fetchStatusMatrix = async () => {
 
 // ─── Metrics ───
 export const fetchCurrentMetrics = async () => {
-  // Get latest metrics per asset (last 10 minutes)
-  const tenMinAgo = new Date(Date.now() - 10 * 60_000).toISOString()
+  // Get latest metrics per asset (last 30 minutes for dashboard)
+  const thirtyMinAgo = new Date(Date.now() - 30 * 60_000).toISOString()
   const { data, error } = await supabase
     .from('metrics')
     .select('*')
-    .gte('time', tenMinAgo)
+    .gte('time', thirtyMinAgo)
     .order('time', { ascending: false })
+    .limit(500)
   if (error) throw error
   return { data: data || [] }
 }
@@ -191,8 +192,36 @@ export const fetchTopN = async (metricName: string, n: number) => {
 }
 
 export const fetchTrafficSummary = async () => {
-  // Return empty — traffic summary needs aggregation not available via PostgREST
-  return { data: [] }
+  const oneHourAgo = new Date(Date.now() - 60 * 60_000).toISOString()
+  const { data: netIn } = await supabase.from('metrics').select('asset_id, value').eq('metric_name', 'network_in').gte('time', oneHourAgo)
+  const { data: netOut } = await supabase.from('metrics').select('asset_id, value').eq('metric_name', 'network_out').gte('time', oneHourAgo)
+  const { data: assets } = await supabase.from('assets').select('id, name, asset_type, location')
+
+  const assetMap = new Map(assets?.map((a) => [a.id, a]) || [])
+  const summary: Record<string, { in_vals: number[]; out_vals: number[] }> = {}
+
+  for (const m of netIn || []) {
+    if (!summary[m.asset_id]) summary[m.asset_id] = { in_vals: [], out_vals: [] }
+    summary[m.asset_id].in_vals.push(m.value)
+  }
+  for (const m of netOut || []) {
+    if (!summary[m.asset_id]) summary[m.asset_id] = { in_vals: [], out_vals: [] }
+    summary[m.asset_id].out_vals.push(m.value)
+  }
+
+  const result = Object.entries(summary).map(([id, s]) => {
+    const asset = assetMap.get(id)
+    const avgIn = s.in_vals.reduce((a, b) => a + b, 0) / (s.in_vals.length || 1)
+    const avgOut = s.out_vals.reduce((a, b) => a + b, 0) / (s.out_vals.length || 1)
+    return {
+      asset_id: id, asset_name: asset?.name || id, asset_type: asset?.asset_type || '', location: asset?.location || '',
+      avg_network_in: Math.round(avgIn), avg_network_out: Math.round(avgOut),
+      max_network_in: Math.round(Math.max(...(s.in_vals.length ? s.in_vals : [0]))),
+      max_network_out: Math.round(Math.max(...(s.out_vals.length ? s.out_vals : [0]))),
+    }
+  })
+
+  return { data: result.sort((a, b) => b.avg_network_in - a.avg_network_in) }
 }
 
 // ─── Logs ───
@@ -281,23 +310,104 @@ const CHAT_RESPONSES: Record<string, string> = {
   상태: '**인프라 현황 요약:**\n\n총 21개 자산 중:\n✅ 정상: 16개 (76%)\n⚠️ 경고: 3개 (14%)\n🔴 다운: 2개 (10%)\n\nSLA 가용률: 90.5% (목표 99.9% 미달)\n\n**주요 이슈:** DB-PRD-03 복합 장애, K8S-WORKER-03 노드 다운',
 }
 
-export const requestDiagnosis = async (assetId: string, _symptom?: string) => {
+export const requestDiagnosis = async (assetId: string, symptom?: string) => {
   // Simulate AI analysis delay
   await new Promise((r) => setTimeout(r, 1500 + Math.random() * 1000))
 
-  // Find asset to determine status
-  const { data: asset } = await supabase.from('assets').select('name, status').eq('id', assetId).single()
+  // Fetch real asset info + latest metrics
+  const [assetRes, metricsRes] = await Promise.all([
+    supabase.from('assets').select('name, status, ip_address, location, extra_info').eq('id', assetId).single(),
+    supabase.from('metrics').select('metric_name, value, unit').eq('asset_id', assetId).order('time', { ascending: false }).limit(10),
+  ])
+
+  const asset = assetRes.data
+  const metrics = metricsRes.data || []
+  const name = asset?.name || 'Unknown'
   const status = asset?.status || 'normal'
-  const template = DIAGNOSIS_DB[status] || DIAGNOSIS_DB.normal
+
+  // Extract latest metric values
+  const latest: Record<string, number> = {}
+  for (const m of metrics) {
+    if (!latest[m.metric_name]) latest[m.metric_name] = m.value
+  }
+  const cpu = latest.cpu_usage ?? 0
+  const mem = latest.memory_usage ?? 0
+  const disk = latest.disk_usage ?? 0
+
+  // Build dynamic diagnosis based on REAL metrics
+  const causes: any[] = []
+  let severity = 2
+  let summary = `[${name}] 정상 상태 — 특이사항 없음`
+
+  if (status === 'down' || cpu === 0) {
+    severity = 10
+    summary = `[${name}] 서버 다운 — 즉시 복구 필요`
+    causes.push({
+      rank: 1, cause: 'Heartbeat 응답 없음 — 서버 접근 불가', confidence: 0.95,
+      evidence: [`최근 2시간 이상 메트릭 수집 실패`, `IP ${asset?.ip_address} ping 응답 없음`, `위치: ${asset?.location}`],
+      immediate_action: `서버실 방문 또는 IPMI/iLO 콘솔로 원격 접속하여 물리 상태 확인`,
+      prevention: 'Heartbeat 이중화 및 자동 페일오버 구성',
+    })
+  }
+
+  if (cpu > 85) {
+    severity = Math.max(severity, cpu > 90 ? 9 : 7)
+    summary = `[${name}] CPU 과부하 (${cpu}%) — ${cpu > 90 ? '긴급' : '주의'}`
+    causes.push({
+      rank: causes.length + 1, cause: `CPU 사용률 ${cpu}% — ${cpu > 90 ? '크리티컬' : '경고'} 수준`, confidence: 0.92,
+      evidence: [`현재 CPU ${cpu}%`, `${asset?.extra_info?.cpu || 'N/A'} 기준 과부하`, `${asset?.extra_info?.role || '서버'} 워크로드 집중`],
+      immediate_action: cpu > 90 ? '비필수 프로세스 kill 및 트래픽 분산 즉시 실행' : '워크로드 분산 및 스케일아웃 검토',
+      prevention: 'CPU 기반 오토스케일링 정책 설정 (threshold: 70%)',
+    })
+  }
+
+  if (mem > 85) {
+    severity = Math.max(severity, mem > 95 ? 9 : 6)
+    if (!summary.includes('과부하')) summary = `[${name}] 메모리 부족 (${mem}%) — ${mem > 95 ? 'OOM 위험' : '주의'}`
+    causes.push({
+      rank: causes.length + 1, cause: `메모리 사용률 ${mem}% — ${mem > 95 ? 'OOM 위험' : '경고'}`, confidence: 0.88,
+      evidence: [`현재 메모리 ${mem}%`, `총 ${asset?.extra_info?.ram || 'N/A'}`, `Swap 사용 가능성`],
+      immediate_action: mem > 95 ? '메모리 누수 프로세스 식별 후 재시작 (top -o %MEM)' : '캐시 정리 및 메모리 사용 패턴 분석',
+      prevention: '메모리 모니터링 알람 강화 및 JVM/컨테이너 메모리 제한 설정',
+    })
+  }
+
+  if (disk > 80) {
+    severity = Math.max(severity, disk > 90 ? 8 : 5)
+    causes.push({
+      rank: causes.length + 1, cause: `디스크 사용률 ${disk}% — ${disk > 90 ? '포화 임박' : '증가 추세'}`, confidence: 0.85,
+      evidence: [`현재 디스크 ${disk}%`, `일일 증가율 약 0.5~1%`, `${disk > 90 ? '3일 내 포화 예상' : '2주 내 90% 도달 예상'}`],
+      immediate_action: disk > 90 ? '로그 정리 (journalctl --vacuum-size=500M) 및 임시 파일 삭제' : '디스크 사용 현황 분석 (du -sh /*)' ,
+      prevention: '로그 로테이션 설정 및 디스크 증설 계획',
+    })
+  }
+
+  if (causes.length === 0) {
+    causes.push({
+      rank: 1, cause: '모든 지표 정상 범위', confidence: 0.90,
+      evidence: [`CPU ${cpu}%`, `메모리 ${mem}%`, `디스크 ${disk}%`, `${asset?.extra_info?.os || 'OS 정보 없음'}`],
+      immediate_action: '즉시 조치 불필요 — 현재 상태 유지',
+      prevention: '정기 점검 스케줄 유지 및 트렌드 모니터링 지속',
+    })
+  }
+
+  if (symptom) {
+    causes.push({
+      rank: causes.length + 1, cause: `사용자 보고 증상: "${symptom}"`, confidence: 0.70,
+      evidence: ['운영자 직접 보고', `관련 자산: ${name} (${asset?.ip_address})`, `시간: ${new Date().toLocaleString('ko-KR')}`],
+      immediate_action: '보고된 증상과 메트릭 상관관계 추가 분석 필요',
+      prevention: '유사 증상 발생 시 자동 알람 규칙 추가',
+    })
+  }
 
   return {
     data: {
       diagnosis_id: `diag-${Date.now()}`,
       asset_id: assetId,
       timestamp: new Date().toISOString(),
-      summary: `[${asset?.name}] ${template.summary}`,
-      severity_score: template.severity,
-      causes: template.causes,
+      summary,
+      severity_score: severity,
+      causes,
     },
   }
 }
