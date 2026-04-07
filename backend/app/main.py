@@ -89,8 +89,11 @@ app.add_middleware(
 async def ensure_seed_middleware(request, call_next):
     """Safety net: ensure tables + seed exist even if lifespan didn't fire."""
     if not _seeded:
-        await _ensure_tables()
-        await _auto_seed()
+        try:
+            await _ensure_tables()
+            await _auto_seed()
+        except Exception as e:
+            logger.error(f"Middleware seed failed (non-fatal): {e}")
     return await call_next(request)
 
 

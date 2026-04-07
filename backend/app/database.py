@@ -1,5 +1,6 @@
 import os
 import ssl as _ssl
+import re
 
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
@@ -15,6 +16,15 @@ if DATABASE_URL:
     elif DATABASE_URL.startswith("postgres://"):
         DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+asyncpg://", 1)
 
+    # Supabase direct connection (port 5432) is IPv6-only.
+    # Use the connection pooler (port 6543) which supports IPv4.
+    if "supabase.co" in DATABASE_URL:
+        DATABASE_URL = re.sub(r":5432/", ":6543/", DATABASE_URL)
+        # Append pgbouncer=true for Supavisor compatibility if not present
+        if "pgbouncer=" not in DATABASE_URL:
+            sep = "&" if "?" in DATABASE_URL else "?"
+            DATABASE_URL += f"{sep}pgbouncer=true"
+
     # Supabase requires SSL
     ssl_ctx = _ssl.create_default_context()
     ssl_ctx.check_hostname = False
@@ -23,11 +33,10 @@ if DATABASE_URL:
     engine = create_async_engine(
         DATABASE_URL,
         echo=False,
-        poolclass=NullPool,  # Serverless: no persistent pool
+        poolclass=NullPool,
         connect_args={
             "ssl": ssl_ctx,
-            "server_settings": {"jit": "off"},  # Faster cold starts
-            "statement_cache_size": 0,  # Disable prepared statement cache
+            "statement_cache_size": 0,  # Required for PgBouncer/Supavisor
         },
     )
     timescale_engine = engine
