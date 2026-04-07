@@ -114,5 +114,26 @@ app.include_router(audit.router, prefix="/api/v1/audit", tags=["Audit"])
 
 @app.get("/health")
 async def health_check():
-    from app.database import IS_POSTGRES
-    return {"status": "ok", "service": "INSITE", "db": "postgresql" if IS_POSTGRES else "sqlite"}
+    from app.database import IS_POSTGRES, DATABASE_URL
+    db_info = "postgresql" if IS_POSTGRES else "sqlite"
+    # Show sanitized URL for debugging (hide password)
+    safe_url = ""
+    if DATABASE_URL:
+        import re
+        safe_url = re.sub(r"://[^@]+@", "://***@", str(DATABASE_URL))
+    return {"status": "ok", "service": "INSITE", "db": db_info, "seeded": _seeded, "url": safe_url}
+
+
+@app.get("/api/v1/seed")
+async def manual_seed():
+    """One-time manual seed endpoint — creates tables and demo data."""
+    try:
+        await _ensure_tables()
+        # Force re-seed by resetting flag
+        global _seeded
+        _seeded = False
+        await _auto_seed()
+        return {"status": "ok", "seeded": _seeded}
+    except Exception as e:
+        import traceback
+        return {"status": "error", "error": str(e), "traceback": traceback.format_exc()}
