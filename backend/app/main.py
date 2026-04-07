@@ -108,4 +108,5 @@ app.include_router(audit.router, prefix="/api/v1/audit", tags=["Audit"])
 
 @app.get("/health")
 async def health_check():
-    return {"status": "ok", "service": "INSITE"}
+    from app.database import IS_POSTGRES
+    return {"status": "ok", "service": "INSITE", "db": "postgresql" if IS_POSTGRES else "sqlite"}
