@@ -20,10 +20,8 @@ if DATABASE_URL:
     # Use the connection pooler (port 6543) which supports IPv4.
     if "supabase.co" in DATABASE_URL:
         DATABASE_URL = re.sub(r":5432/", ":6543/", DATABASE_URL)
-        # Append pgbouncer=true for Supavisor compatibility if not present
-        if "pgbouncer=" not in DATABASE_URL:
-            sep = "&" if "?" in DATABASE_URL else "?"
-            DATABASE_URL += f"{sep}pgbouncer=true"
+        # Remove pgbouncer param if present — asyncpg doesn't understand it
+        DATABASE_URL = re.sub(r"[?&]pgbouncer=[^&]*", "", DATABASE_URL)
 
     # Supabase requires SSL
     ssl_ctx = _ssl.create_default_context()
