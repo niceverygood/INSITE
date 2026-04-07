@@ -14,27 +14,52 @@ from app.core.security import hash_password
 now = datetime.now(timezone.utc)
 
 ASSETS = [
-    {"asset_type": "server", "name": "WEB-PRD-01", "ip": "10.0.1.10", "loc": "서울 IDC A동 3F", "status": "normal"},
-    {"asset_type": "server", "name": "WEB-PRD-02", "ip": "10.0.1.11", "loc": "서울 IDC A동 3F", "status": "normal"},
-    {"asset_type": "server", "name": "WEB-PRD-03", "ip": "10.0.1.12", "loc": "서울 IDC A동 3F", "status": "warning"},
-    {"asset_type": "server", "name": "API-PRD-01", "ip": "10.0.2.10", "loc": "서울 IDC A동 3F", "status": "normal"},
-    {"asset_type": "server", "name": "API-PRD-02", "ip": "10.0.2.11", "loc": "서울 IDC A동 3F", "status": "normal"},
-    {"asset_type": "server", "name": "DB-PRD-01", "ip": "10.0.3.10", "loc": "서울 IDC B동 2F", "status": "normal"},
-    {"asset_type": "server", "name": "DB-PRD-02", "ip": "10.0.3.11", "loc": "서울 IDC B동 2F", "status": "normal"},
-    {"asset_type": "server", "name": "DB-PRD-03", "ip": "10.0.3.12", "loc": "서울 IDC B동 2F", "status": "down"},
-    {"asset_type": "server", "name": "CACHE-PRD-01", "ip": "10.0.4.10", "loc": "서울 IDC A동 3F", "status": "normal"},
-    {"asset_type": "server", "name": "KAFKA-PRD-01", "ip": "10.0.5.10", "loc": "서울 IDC B동 3F", "status": "normal"},
-    {"asset_type": "server", "name": "KAFKA-PRD-03", "ip": "10.0.5.12", "loc": "서울 IDC B동 3F", "status": "warning"},
-    {"asset_type": "server", "name": "ES-PRD-01", "ip": "10.0.6.10", "loc": "서울 IDC B동 3F", "status": "normal"},
-    {"asset_type": "network_device", "name": "CORE-SW-01", "ip": "10.0.0.1", "loc": "서울 IDC A동 1F", "status": "normal"},
-    {"asset_type": "network_device", "name": "CORE-SW-02", "ip": "10.0.0.2", "loc": "서울 IDC B동 1F", "status": "normal"},
-    {"asset_type": "network_device", "name": "DIST-SW-B2", "ip": "10.0.0.11", "loc": "서울 IDC B동 2F", "status": "warning"},
-    {"asset_type": "network_device", "name": "FW-EXT-01", "ip": "10.0.0.50", "loc": "서울 IDC A동 1F", "status": "normal"},
-    {"asset_type": "network_device", "name": "LB-PRD-01", "ip": "10.0.0.60", "loc": "서울 IDC A동 1F", "status": "normal"},
-    {"asset_type": "vm", "name": "DEV-VM-01", "ip": "10.10.1.10", "loc": "서울 IDC A동 3F", "status": "normal"},
-    {"asset_type": "system", "name": "K8S-MASTER-01", "ip": "10.0.10.10", "loc": "서울 IDC B동 3F", "status": "normal"},
-    {"asset_type": "system", "name": "K8S-WORKER-01", "ip": "10.0.10.20", "loc": "서울 IDC B동 3F", "status": "normal"},
-    {"asset_type": "system", "name": "K8S-WORKER-03", "ip": "10.0.10.22", "loc": "서울 IDC B동 3F", "status": "down"},
+    # Servers
+    {"asset_type": "server", "name": "WEB-PRD-01", "ip": "10.0.1.10", "mac": "00:1A:2B:3C:01:10", "loc": "서울 IDC A동 3F", "status": "normal",
+     "extra": {"os": "Ubuntu 22.04", "cpu": "16 cores", "ram": "64GB", "role": "Web Server"}},
+    {"asset_type": "server", "name": "WEB-PRD-02", "ip": "10.0.1.11", "mac": "00:1A:2B:3C:01:11", "loc": "서울 IDC A동 3F", "status": "normal",
+     "extra": {"os": "Ubuntu 22.04", "cpu": "16 cores", "ram": "64GB", "role": "Web Server"}},
+    {"asset_type": "server", "name": "WEB-PRD-03", "ip": "10.0.1.12", "mac": "00:1A:2B:3C:01:12", "loc": "서울 IDC A동 3F", "status": "warning",
+     "extra": {"os": "Ubuntu 22.04", "cpu": "16 cores", "ram": "64GB", "role": "Web Server"}},
+    {"asset_type": "server", "name": "API-PRD-01", "ip": "10.0.2.10", "mac": "00:1A:2B:3C:02:10", "loc": "서울 IDC A동 3F", "status": "normal",
+     "extra": {"os": "CentOS 8", "cpu": "32 cores", "ram": "128GB", "role": "API Server"}},
+    {"asset_type": "server", "name": "API-PRD-02", "ip": "10.0.2.11", "mac": "00:1A:2B:3C:02:11", "loc": "서울 IDC A동 3F", "status": "normal",
+     "extra": {"os": "CentOS 8", "cpu": "32 cores", "ram": "128GB", "role": "API Server"}},
+    {"asset_type": "server", "name": "DB-PRD-01", "ip": "10.0.3.10", "mac": "00:1A:2B:3C:03:10", "loc": "서울 IDC B동 2F", "status": "normal",
+     "extra": {"os": "Rocky Linux 9", "cpu": "64 cores", "ram": "256GB", "role": "Primary DB"}},
+    {"asset_type": "server", "name": "DB-PRD-02", "ip": "10.0.3.11", "mac": "00:1A:2B:3C:03:11", "loc": "서울 IDC B동 2F", "status": "normal",
+     "extra": {"os": "Rocky Linux 9", "cpu": "64 cores", "ram": "256GB", "role": "Replica DB"}},
+    {"asset_type": "server", "name": "DB-PRD-03", "ip": "10.0.3.12", "mac": "00:1A:2B:3C:03:12", "loc": "서울 IDC B동 2F", "status": "down",
+     "extra": {"os": "Rocky Linux 9", "cpu": "64 cores", "ram": "256GB", "role": "Replica DB"}},
+    {"asset_type": "server", "name": "CACHE-PRD-01", "ip": "10.0.4.10", "mac": "00:1A:2B:3C:04:10", "loc": "서울 IDC A동 3F", "status": "normal",
+     "extra": {"os": "Ubuntu 22.04", "cpu": "8 cores", "ram": "32GB", "role": "Redis Cache"}},
+    {"asset_type": "server", "name": "KAFKA-PRD-01", "ip": "10.0.5.10", "mac": "00:1A:2B:3C:05:10", "loc": "서울 IDC B동 3F", "status": "normal",
+     "extra": {"os": "Ubuntu 22.04", "cpu": "16 cores", "ram": "64GB", "role": "Kafka Broker"}},
+    {"asset_type": "server", "name": "KAFKA-PRD-03", "ip": "10.0.5.12", "mac": "00:1A:2B:3C:05:12", "loc": "서울 IDC B동 3F", "status": "warning",
+     "extra": {"os": "Ubuntu 22.04", "cpu": "16 cores", "ram": "64GB", "role": "Kafka Broker"}},
+    {"asset_type": "server", "name": "ES-PRD-01", "ip": "10.0.6.10", "mac": "00:1A:2B:3C:06:10", "loc": "서울 IDC B동 3F", "status": "normal",
+     "extra": {"os": "Ubuntu 22.04", "cpu": "32 cores", "ram": "128GB", "role": "Elasticsearch"}},
+    # Network Devices
+    {"asset_type": "network_device", "name": "CORE-SW-01", "ip": "10.0.0.1", "mac": "00:1A:2B:AA:00:01", "loc": "서울 IDC A동 1F", "status": "normal",
+     "extra": {"vendor": "Cisco", "model": "Nexus 9300", "firmware": "10.3.2"}},
+    {"asset_type": "network_device", "name": "CORE-SW-02", "ip": "10.0.0.2", "mac": "00:1A:2B:AA:00:02", "loc": "서울 IDC B동 1F", "status": "normal",
+     "extra": {"vendor": "Cisco", "model": "Nexus 9300", "firmware": "10.3.2"}},
+    {"asset_type": "network_device", "name": "DIST-SW-B2", "ip": "10.0.0.11", "mac": "00:1A:2B:BB:00:11", "loc": "서울 IDC B동 2F", "status": "warning",
+     "extra": {"vendor": "Juniper", "model": "EX4300", "firmware": "21.4R3"}},
+    {"asset_type": "network_device", "name": "FW-EXT-01", "ip": "10.0.0.50", "mac": "00:1A:2B:CC:00:50", "loc": "서울 IDC A동 1F", "status": "normal",
+     "extra": {"vendor": "Palo Alto", "model": "PA-5260", "firmware": "11.1.2"}},
+    {"asset_type": "network_device", "name": "LB-PRD-01", "ip": "10.0.0.60", "mac": "00:1A:2B:DD:00:60", "loc": "서울 IDC A동 1F", "status": "normal",
+     "extra": {"vendor": "F5", "model": "BIG-IP i5800", "firmware": "17.1.1"}},
+    # VMs
+    {"asset_type": "vm", "name": "DEV-VM-01", "ip": "10.10.1.10", "mac": "00:50:56:A1:01:10", "loc": "서울 IDC A동 3F", "status": "normal",
+     "extra": {"hypervisor": "VMware", "cpu": "4 cores", "ram": "16GB", "role": "Dev Server"}},
+    # Systems
+    {"asset_type": "system", "name": "K8S-MASTER-01", "ip": "10.0.10.10", "mac": "00:1A:2B:EE:10:10", "loc": "서울 IDC B동 3F", "status": "normal",
+     "extra": {"type": "Kubernetes", "version": "1.29.2", "role": "Control Plane"}},
+    {"asset_type": "system", "name": "K8S-WORKER-01", "ip": "10.0.10.20", "mac": "00:1A:2B:EE:10:20", "loc": "서울 IDC B동 3F", "status": "normal",
+     "extra": {"type": "Kubernetes", "version": "1.29.2", "role": "Worker Node"}},
+    {"asset_type": "system", "name": "K8S-WORKER-03", "ip": "10.0.10.22", "mac": "00:1A:2B:EE:10:22", "loc": "서울 IDC B동 3F", "status": "down",
+     "extra": {"type": "Kubernetes", "version": "1.29.2", "role": "Worker Node"}},
 ]
 
 PROFILES = {
@@ -67,7 +92,9 @@ async def seed_lite():
         asset_ids = {}
         for a in ASSETS:
             asset = Asset(id=uuid.uuid4(), asset_type=a["asset_type"], name=a["name"],
-                          ip_address=a["ip"], location=a["loc"], status=a["status"],
+                          ip_address=a["ip"], mac_address=a.get("mac"),
+                          location=a["loc"], status=a["status"],
+                          extra_info=a.get("extra"),
                           last_heartbeat=now - timedelta(seconds=random.randint(5, 60)) if a["status"] != "down" else now - timedelta(hours=2))
             db.add(asset)
             asset_ids[a["name"]] = asset.id
