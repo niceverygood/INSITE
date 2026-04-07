@@ -4,6 +4,7 @@ import { fetchAlerts, acknowledgeAlert, resolveAlert, fetchAlertRules, createAle
 import { cn } from '@/utils/cn'
 import { Check, CheckCheck, AlertTriangle, AlertCircle, Info, Plus, Pencil, Trash2, X } from 'lucide-react'
 import type { Alert, AlertRule } from '@/types'
+import { DEMO_ALERTS, DEMO_ALERT_RULES } from '@/data/demo'
 
 const severityIcon = {
   critical: <AlertCircle className="h-4 w-4 text-red-400" />,
@@ -45,11 +46,12 @@ export default function AlertsPage() {
   const [form, setForm] = useState<RuleFormData>(emptyForm)
 
   // Alerts queries
-  const { data: alerts, isLoading } = useQuery({
+  const { data: apiAlerts, isLoading } = useQuery({
     queryKey: ['all-alerts'],
     queryFn: async () => (await fetchAlerts({ page_size: '100' })).data as Alert[],
     refetchInterval: 10_000,
   })
+  const alerts = apiAlerts?.length ? apiAlerts : DEMO_ALERTS
 
   const ackMutation = useMutation({
     mutationFn: acknowledgeAlert,
@@ -62,11 +64,12 @@ export default function AlertsPage() {
   })
 
   // Rules queries
-  const { data: rules, isLoading: rulesLoading } = useQuery({
+  const { data: apiRules, isLoading: rulesLoading } = useQuery({
     queryKey: ['alert-rules'],
     queryFn: async () => (await fetchAlertRules()).data as AlertRule[],
     refetchInterval: 30_000,
   })
+  const rules = apiRules?.length ? apiRules : DEMO_ALERT_RULES
 
   const createMutation = useMutation({
     mutationFn: (data: RuleFormData) => createAlertRule(data as unknown as Record<string, unknown>),

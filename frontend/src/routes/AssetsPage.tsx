@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { fetchAssets, createAsset } from '@/services/api'
 import { cn } from '@/utils/cn'
 import { Search, Plus, Server, Wifi, Monitor, Cloud, X, ChevronDown, ChevronUp, Cpu, HardDrive, MemoryStick, MapPin, Clock, Info } from 'lucide-react'
 import type { Asset, AssetType, AssetStatus } from '@/types'
+import { DEMO_ASSETS } from '@/data/demo'
 
 const typeIcons: Record<AssetType, typeof Server> = {
   server: Server,
@@ -35,7 +36,7 @@ export default function AssetsPage() {
 
   const queryClient = useQueryClient()
 
-  const { data, isLoading } = useQuery({
+  const { data: apiData, isLoading } = useQuery({
     queryKey: ['assets', search, typeFilter, statusFilter, page],
     queryFn: async () => {
       const params: Record<string, string | number> = { page, page_size: 20 }
@@ -45,6 +46,22 @@ export default function AssetsPage() {
       return (await fetchAssets(params)).data
     },
   })
+
+  // Fallback to demo data when API returns empty
+  const data = useMemo(() => {
+    if (apiData?.items?.length) return apiData
+    // Build fallback from demo data with client-side filtering
+    let items = DEMO_ASSETS as Asset[]
+    if (search) {
+      const q = search.toLowerCase()
+      items = items.filter((a) => a.name.toLowerCase().includes(q) || a.ip_address.includes(q))
+    }
+    if (typeFilter) items = items.filter((a) => a.asset_type === typeFilter)
+    if (statusFilter) items = items.filter((a) => a.status === statusFilter)
+    const total = items.length
+    const paged = items.slice((page - 1) * 20, page * 20)
+    return { items: paged, total, page, page_size: 20 }
+  }, [apiData, search, typeFilter, statusFilter, page])
 
   return (
     <div>
