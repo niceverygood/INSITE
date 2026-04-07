@@ -3,6 +3,7 @@ import ssl as _ssl
 
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.pool import NullPool
 
 # ─── Dual-mode: PostgreSQL (Supabase) when DATABASE_URL is set, else SQLite ───
 DATABASE_URL = os.environ.get("DATABASE_URL")
@@ -14,7 +15,7 @@ if DATABASE_URL:
     elif DATABASE_URL.startswith("postgres://"):
         DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+asyncpg://", 1)
 
-    # Supabase requires SSL — create a permissive SSL context for asyncpg
+    # Supabase requires SSL
     ssl_ctx = _ssl.create_default_context()
     ssl_ctx.check_hostname = False
     ssl_ctx.verify_mode = _ssl.CERT_NONE
@@ -22,13 +23,13 @@ if DATABASE_URL:
     engine = create_async_engine(
         DATABASE_URL,
         echo=False,
-        pool_size=5,
-        max_overflow=10,
-        pool_pre_ping=True,
-        pool_recycle=300,
-        connect_args={"ssl": ssl_ctx},
+        poolclass=NullPool,  # Serverless: no persistent pool
+        connect_args={
+            "ssl": ssl_ctx,
+            "server_settings": {"jit": "off"},  # Faster cold starts
+            "statement_cache_size": 0,  # Disable prepared statement cache
+        },
     )
-    # Use same Supabase DB for metrics (no separate TimescaleDB needed)
     timescale_engine = engine
     IS_POSTGRES = True
 else:
