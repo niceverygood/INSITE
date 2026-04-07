@@ -42,6 +42,16 @@ export default function DashboardGrid() {
   const allAlerts = alerts?.length ? alerts : recentAlerts
   const allMetrics = metrics?.length ? metrics : realtimeMetrics
 
+  // Normalize statusMatrix — Supabase returns flat array with id/name/status
+  const matrixItems = (statusMatrix || []).map((item: any) => ({
+    asset_id: item.id || item.asset_id,
+    asset_name: item.name || item.asset_name,
+    status: item.status,
+    asset_type: item.asset_type,
+    ip_address: item.ip_address,
+    location: item.location,
+  }))
+
   // Compute averages for gauges
   const avg = (name: string) => {
     const filtered = allMetrics.filter((m) => m.metric_name === name)
@@ -53,7 +63,7 @@ export default function DashboardGrid() {
     <div className="space-y-6">
       {/* Row 1: Status + Gauges */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <StatusMatrix items={statusMatrix?.items ?? []} />
+        <StatusMatrix items={matrixItems} />
         <div className="bg-gray-800 rounded-xl p-5 border border-gray-700">
           <h3 className="text-sm font-semibold text-gray-300 mb-4">리소스 사용률 (평균)</h3>
           <div className="flex justify-around">
@@ -68,14 +78,14 @@ export default function DashboardGrid() {
       {/* Row 2: Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <TrafficChart data={allMetrics} />
-        <NetworkMap items={statusMatrix?.items ?? []} />
+        <NetworkMap items={matrixItems} />
       </div>
 
-      {/* Row 3: Heatmap placeholder */}
+      {/* Row 3: Heatmap */}
       <div className="bg-gray-800 rounded-xl p-5 border border-gray-700">
         <h3 className="text-sm font-semibold text-gray-300 mb-4">자산 상태 히트맵</h3>
         <div className="grid grid-cols-10 gap-1">
-          {(statusMatrix?.items ?? []).map((item: { asset_id: string; asset_name: string; status: string }) => (
+          {matrixItems.map((item: any) => (
             <div
               key={item.asset_id}
               title={`${item.asset_name} (${item.status})`}
@@ -89,7 +99,7 @@ export default function DashboardGrid() {
             />
           ))}
         </div>
-        {(!statusMatrix?.items || statusMatrix.items.length === 0) && (
+        {matrixItems.length === 0 && (
           <p className="text-gray-500 text-sm text-center py-8">등록된 자산 없음</p>
         )}
       </div>
