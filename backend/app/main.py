@@ -64,8 +64,11 @@ async def _auto_seed():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await _ensure_tables()
-    await _auto_seed()
+    try:
+        await _ensure_tables()
+        await _auto_seed()
+    except Exception as e:
+        logger.error(f"Lifespan startup failed (non-fatal): {e}")
     yield
 
 
