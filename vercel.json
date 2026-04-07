@@ -1,22 +1,8 @@
 {
   "buildCommand": "cd frontend && npm install && npm run build && cp -r dist/. ../public/",
-  "functions": {
-    "api/**/*.py": {
-      "maxDuration": 30
-    }
-  },
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-      "dest": "/api/[...path].py"
-    },
-    {
-      "src": "/health",
-      "methods": ["GET"],
-      "dest": "/api/[...path].py"
-    },
-    { "handle": "filesystem" },
-    { "src": "/(.*)", "dest": "/index.html" }
+  "rewrites": [
+    { "source": "/api/v1/(.*)", "destination": "/api" },
+    { "source": "/health", "destination": "/api" },
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
