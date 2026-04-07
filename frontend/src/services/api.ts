@@ -48,9 +48,9 @@ export const login = (username: string, password: string) =>
 
 // Assets
 export const fetchAssets = (params?: Record<string, string | number>) =>
-  api.get('/assets/', { params })
+  api.get('/assets', { params })
 export const fetchAsset = (id: string) => api.get(`/assets/${id}`)
-export const createAsset = (data: Record<string, unknown>) => api.post('/assets/', data)
+export const createAsset = (data: Record<string, unknown>) => api.post('/assets', data)
 export const updateAsset = (id: string, data: Record<string, unknown>) => api.put(`/assets/${id}`, data)
 export const deleteAsset = (id: string) => api.delete(`/assets/${id}`)
 
@@ -62,7 +62,7 @@ export const fetchTopN = (metricName: string, n: number) =>
 export const fetchTrafficSummary = () => api.get('/metrics/traffic-summary')
 
 // Alerts
-export const fetchAlerts = (params?: Record<string, string>) => api.get('/alerts/', { params })
+export const fetchAlerts = (params?: Record<string, string>) => api.get('/alerts', { params })
 export const fetchActiveAlerts = () => api.get('/alerts/active')
 export const acknowledgeAlert = (id: string) => api.put(`/alerts/${id}/acknowledge`)
 export const resolveAlert = (id: string) => api.put(`/alerts/${id}/resolve`)
@@ -87,7 +87,7 @@ export const aiChat = (message: string) => api.post('/ai/chat', { message })
 
 // Reports
 export const generateReport = (data: Record<string, string>) => api.post('/reports/generate', data)
-export const fetchReports = () => api.get('/reports/')
+export const fetchReports = () => api.get('/reports')
 
 // Audit
-export const fetchAuditLogs = (params?: Record<string, string>) => api.get('/audit/', { params })
+export const fetchAuditLogs = (params?: Record<string, string>) => api.get('/audit', { params })
