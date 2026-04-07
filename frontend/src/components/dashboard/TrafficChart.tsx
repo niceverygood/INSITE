@@ -10,11 +10,14 @@ interface Props {
   height?: number
 }
 
+const TYPE_KR: Record<string, string> = {
+  server: '서버', network_device: '네트워크', system: '시스템', vm: 'VM',
+}
+
 export default function TrafficChart({ data, height = 260 }: Props) {
-  // Group by time, show network_in and network_out
   const grouped: Record<string, { time: string; network_in: number; network_out: number }> = {}
   for (const m of data) {
-    const timeKey = m.time.slice(11, 16) // HH:MM
+    const timeKey = m.time.slice(11, 16)
     if (!grouped[timeKey]) grouped[timeKey] = { time: timeKey, network_in: 0, network_out: 0 }
     if (m.metric_name === 'network_in') grouped[timeKey].network_in = m.value
     if (m.metric_name === 'network_out') grouped[timeKey].network_out = m.value
@@ -26,6 +29,9 @@ export default function TrafficChart({ data, height = 260 }: Props) {
     queryFn: async () => (await fetchTrafficSummary()).data as TrafficSummary[],
     refetchInterval: 30_000,
   })
+
+  // Show top 5 by traffic
+  const top5 = trafficSummary?.slice(0, 5) ?? []
 
   return (
     <div className="bg-gray-800 rounded-xl p-5 border border-gray-700">
@@ -45,33 +51,32 @@ export default function TrafficChart({ data, height = 260 }: Props) {
         </LineChart>
       </ResponsiveContainer>
 
-      {/* Per-asset traffic summary table */}
-      {trafficSummary && trafficSummary.length > 0 && (
-        <div className="mt-5">
-          <h4 className="text-sm font-semibold text-gray-300 mb-3">장비별 트래픽 현황</h4>
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead className="bg-gray-900/50">
-                <tr className="text-gray-400 text-left">
-                  <th className="px-3 py-2 font-medium">장비명</th>
-                  <th className="px-3 py-2 font-medium">유형</th>
-                  <th className="px-3 py-2 font-medium">위치</th>
-                  <th className="px-3 py-2 font-medium text-right">평균 In</th>
-                  <th className="px-3 py-2 font-medium text-right">평균 Out</th>
-                  <th className="px-3 py-2 font-medium text-right">최대 In</th>
-                  <th className="px-3 py-2 font-medium text-right">최대 Out</th>
+      {/* Top 5 traffic table */}
+      {top5.length > 0 && (
+        <div className="mt-4">
+          <h4 className="text-xs font-medium text-gray-400 mb-2">트래픽 상위 장비 (Kbps)</h4>
+          <div className="overflow-x-auto -mx-2">
+            <table className="w-full text-xs min-w-[500px]">
+              <thead>
+                <tr className="text-gray-500 border-b border-gray-700">
+                  <th className="text-left py-1.5 px-2 font-medium">장비</th>
+                  <th className="text-right py-1.5 px-2 font-medium">평균 In</th>
+                  <th className="text-right py-1.5 px-2 font-medium">평균 Out</th>
+                  <th className="text-right py-1.5 px-2 font-medium">최대 In</th>
+                  <th className="text-right py-1.5 px-2 font-medium">최대 Out</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-700">
-                {trafficSummary.map((item) => (
-                  <tr key={item.asset_id} className="hover:bg-gray-700/50 transition-colors">
-                    <td className="px-3 py-2 text-gray-200">{item.asset_name}</td>
-                    <td className="px-3 py-2 text-gray-400">{item.asset_type}</td>
-                    <td className="px-3 py-2 text-gray-400">{item.location || '-'}</td>
-                    <td className="px-3 py-2 text-blue-400 text-right">{item.avg_network_in.toLocaleString()}</td>
-                    <td className="px-3 py-2 text-emerald-400 text-right">{item.avg_network_out.toLocaleString()}</td>
-                    <td className="px-3 py-2 text-blue-300 text-right">{item.max_network_in.toLocaleString()}</td>
-                    <td className="px-3 py-2 text-emerald-300 text-right">{item.max_network_out.toLocaleString()}</td>
+              <tbody>
+                {top5.map((item) => (
+                  <tr key={item.asset_id} className="border-b border-gray-700/50">
+                    <td className="py-1.5 px-2">
+                      <div className="text-gray-200 font-medium">{item.asset_name}</div>
+                      <div className="text-gray-500 text-[10px]">{TYPE_KR[item.asset_type] || item.asset_type} · {item.location || '-'}</div>
+                    </td>
+                    <td className="py-1.5 px-2 text-blue-400 text-right font-mono">{item.avg_network_in.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
+                    <td className="py-1.5 px-2 text-emerald-400 text-right font-mono">{item.avg_network_out.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
+                    <td className="py-1.5 px-2 text-blue-300/70 text-right font-mono">{item.max_network_in.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
+                    <td className="py-1.5 px-2 text-emerald-300/70 text-right font-mono">{item.max_network_out.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
                   </tr>
                 ))}
               </tbody>

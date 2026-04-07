@@ -17,6 +17,7 @@ export interface Asset {
   status: AssetStatus
   last_heartbeat?: string
   metadata?: Record<string, unknown>
+  extra_info?: Record<string, any>
   created_at: string
   updated_at: string
 }
