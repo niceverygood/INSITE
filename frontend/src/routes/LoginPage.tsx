@@ -23,7 +23,8 @@ export default function LoginPage() {
     setLoading(true)
     try {
       const res = await login(user, pass)
-      setAuth({ id: '', username: user, email: '', role: 'viewer', is_active: true }, res.data.access_token, res.data.refresh_token)
+      const userInfo = res.data.user || { id: '', username: user, email: '', role: 'viewer' }
+      setAuth({ id: userInfo.id, username: userInfo.username, email: userInfo.email, role: userInfo.role, is_active: true }, res.data.access_token, res.data.refresh_token)
       navigate('/dashboard')
     } catch {
       setError('아이디 또는 비밀번호가 올바르지 않습니다')
