@@ -4,6 +4,7 @@
   "framework": null,
   "trailingSlash": false,
   "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api" },
     { "source": "/health", "destination": "/api" },
     { "source": "/docs", "destination": "/api" },
     { "source": "/openapi.json", "destination": "/api" },
