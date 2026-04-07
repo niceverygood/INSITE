@@ -413,25 +413,176 @@ export const requestDiagnosis = async (assetId: string, symptom?: string) => {
 }
 
 export const fetchPredictions = async () => {
-  return { data: PREDICTIONS_DEMO }
+  // Query real metrics to find assets with high resource usage trends
+  const fiveMinAgo = new Date(Date.now() - 5 * 60_000).toISOString()
+  const { data: diskMetrics } = await supabase.from('metrics').select('asset_id, value').eq('metric_name', 'disk_usage').gte('time', fiveMinAgo).order('value', { ascending: false }).limit(30)
+  const { data: memMetrics } = await supabase.from('metrics').select('asset_id, value').eq('metric_name', 'memory_usage').gte('time', fiveMinAgo).order('value', { ascending: false }).limit(30)
+  const { data: assets } = await supabase.from('assets').select('id, name').neq('status', 'down')
+  const nameMap = new Map(assets?.map((a) => [a.id, a.name]) || [])
+
+  const predictions: any[] = []
+  const seen = new Set<string>()
+
+  // Disk predictions
+  for (const m of diskMetrics || []) {
+    if (seen.has(`disk-${m.asset_id}`) || m.value < 70) continue
+    seen.add(`disk-${m.asset_id}`)
+    const name = nameMap.get(m.asset_id)
+    if (!name) continue
+    const daysLeft = Math.max(1, Math.round((100 - m.value) / 0.5))
+    predictions.push({
+      asset_name: name, metric_name: 'disk_usage', current_value: Math.round(m.value),
+      severity: m.value > 90 ? 'critical' : 'warning', days_remaining: daysLeft,
+    })
+  }
+
+  // Memory predictions
+  for (const m of memMetrics || []) {
+    if (seen.has(`mem-${m.asset_id}`) || m.value < 80) continue
+    seen.add(`mem-${m.asset_id}`)
+    const name = nameMap.get(m.asset_id)
+    if (!name) continue
+    const daysLeft = Math.max(1, Math.round((100 - m.value) / 0.3))
+    predictions.push({
+      asset_name: name, metric_name: 'memory_usage', current_value: Math.round(m.value),
+      severity: m.value > 95 ? 'critical' : 'warning', days_remaining: daysLeft,
+    })
+  }
+
+  return { data: predictions.sort((a, b) => a.days_remaining - b.days_remaining).slice(0, 6) }
 }
 
 export const aiChat = async (message: string) => {
-  // Simulate AI thinking
-  await new Promise((r) => setTimeout(r, 800 + Math.random() * 1200))
+  await new Promise((r) => setTimeout(r, 600 + Math.random() * 800))
 
   const lower = message.toLowerCase()
-  // Find matching response
-  for (const [key, response] of Object.entries(CHAT_RESPONSES)) {
-    if (lower.includes(key)) {
-      return { data: { message: response } }
-    }
+
+  // ─── Live data queries based on keywords ───
+
+  // CPU 관련
+  if (lower.includes('cpu')) {
+    const fiveMinAgo = new Date(Date.now() - 5 * 60_000).toISOString()
+    const { data: cpuMetrics } = await supabase.from('metrics').select('asset_id, value').eq('metric_name', 'cpu_usage').gte('time', fiveMinAgo).order('value', { ascending: false }).limit(21)
+    const { data: assets } = await supabase.from('assets').select('id, name, status')
+    const nameMap = new Map(assets?.map((a) => [a.id, a]) || [])
+    const seen = new Set<string>()
+    const top = (cpuMetrics || []).filter((m) => { if (seen.has(m.asset_id)) return false; seen.add(m.asset_id); return true }).slice(0, 5)
+    const lines = top.map((m, i) => {
+      const a = nameMap.get(m.asset_id)
+      const icon = m.value > 90 ? '🔴' : m.value > 70 ? '🟡' : '🟢'
+      return `${i + 1}. ${icon} **${a?.name || 'Unknown'}** — ${m.value}%${a?.status === 'down' ? ' (다운)' : ''}`
+    })
+    return { data: { message: `**CPU 사용률 Top 5** (최근 5분 기준)\n\n${lines.join('\n')}\n\n${top[0]?.value > 90 ? '⚠️ 1위 자산은 크리티컬 수준입니다. AI 진단 탭에서 상세 분석을 권장합니다.' : '전반적으로 안정적인 상태입니다.'}` } }
   }
 
-  // Default response
+  // 메모리 관련
+  if (lower.includes('메모리') || lower.includes('memory') || lower.includes('ram') || lower.includes('oom')) {
+    const fiveMinAgo = new Date(Date.now() - 5 * 60_000).toISOString()
+    const { data: memMetrics } = await supabase.from('metrics').select('asset_id, value').eq('metric_name', 'memory_usage').gte('time', fiveMinAgo).order('value', { ascending: false }).limit(21)
+    const { data: assets } = await supabase.from('assets').select('id, name, extra_info')
+    const nameMap = new Map(assets?.map((a) => [a.id, a]) || [])
+    const seen = new Set<string>()
+    const top = (memMetrics || []).filter((m) => { if (seen.has(m.asset_id)) return false; seen.add(m.asset_id); return true }).slice(0, 5)
+    const lines = top.map((m, i) => {
+      const a = nameMap.get(m.asset_id)
+      const icon = m.value > 95 ? '🔴' : m.value > 85 ? '🟡' : '🟢'
+      return `${i + 1}. ${icon} **${a?.name}** — ${m.value}% (총 ${a?.extra_info?.ram || 'N/A'})`
+    })
+    return { data: { message: `**메모리 사용률 Top 5** (최근 5분)\n\n${lines.join('\n')}\n\n${top[0]?.value > 95 ? '🚨 OOM 위험이 있는 자산이 있습니다! 즉시 확인하세요.' : top[0]?.value > 85 ? '⚠️ 주의가 필요한 자산이 있습니다.' : '메모리 상태가 안정적입니다.'}` } }
+  }
+
+  // 디스크 관련
+  if (lower.includes('디스크') || lower.includes('disk') || lower.includes('저장')) {
+    const fiveMinAgo = new Date(Date.now() - 5 * 60_000).toISOString()
+    const { data: diskMetrics } = await supabase.from('metrics').select('asset_id, value').eq('metric_name', 'disk_usage').gte('time', fiveMinAgo).order('value', { ascending: false }).limit(21)
+    const { data: assets } = await supabase.from('assets').select('id, name')
+    const nameMap = new Map(assets?.map((a) => [a.id, a]) || [])
+    const seen = new Set<string>()
+    const top = (diskMetrics || []).filter((m) => { if (seen.has(m.asset_id)) return false; seen.add(m.asset_id); return true }).slice(0, 5)
+    const lines = top.map((m, i) => {
+      const a = nameMap.get(m.asset_id)
+      const icon = m.value > 90 ? '🔴' : m.value > 80 ? '🟡' : '🟢'
+      const daysLeft = m.value > 80 ? Math.round((100 - m.value) / 0.5) : null
+      return `${i + 1}. ${icon} **${a?.name}** — ${m.value}%${daysLeft ? ` (약 ${daysLeft}일 후 포화 예상)` : ''}`
+    })
+    return { data: { message: `**디스크 사용률 Top 5** (최근 5분)\n\n${lines.join('\n')}\n\n${top[0]?.value > 90 ? '🚨 긴급! 디스크 정리 또는 증설이 필요합니다.\n권장: `journalctl --vacuum-size=500M && find /tmp -mtime +7 -delete`' : '디스크 상태를 지속 모니터링하세요.'}` } }
+  }
+
+  // 장애/다운 관련
+  if (lower.includes('장애') || lower.includes('다운') || lower.includes('down') || lower.includes('사고')) {
+    const { data: downAssets } = await supabase.from('assets').select('name, ip_address, location, last_heartbeat, extra_info').eq('status', 'down')
+    if (!downAssets?.length) {
+      return { data: { message: '✅ 현재 다운된 자산이 없습니다. 모든 서비스가 정상 운영 중입니다.' } }
+    }
+    const lines = downAssets.map((a, i) => {
+      const hb = a.last_heartbeat ? new Date(a.last_heartbeat) : null
+      const ago = hb ? Math.round((Date.now() - hb.getTime()) / 60000) : 0
+      return `${i + 1}. 🔴 **${a.name}** (${a.ip_address})\n   위치: ${a.location}\n   역할: ${a.extra_info?.role || a.extra_info?.type || 'N/A'}\n   마지막 응답: ${ago > 60 ? `${Math.round(ago / 60)}시간 ${ago % 60}분 전` : `${ago}분 전`}`
+    })
+    return { data: { message: `**현재 장애 자산 ${downAssets.length}건**\n\n${lines.join('\n\n')}\n\n💡 AI 진단 탭에서 자산을 선택하면 상세 원인 분석을 받을 수 있습니다.` } }
+  }
+
+  // 알람 관련
+  if (lower.includes('알람') || lower.includes('알림') || lower.includes('alert')) {
+    const { data: alerts } = await supabase.from('alerts').select('severity, title, status, fired_at').eq('status', 'firing').order('fired_at', { ascending: false })
+    const critical = alerts?.filter((a) => a.severity === 'critical') || []
+    const warning = alerts?.filter((a) => a.severity === 'warning') || []
+    const lines = (alerts || []).slice(0, 8).map((a) => {
+      const icon = a.severity === 'critical' ? '🔴' : '🟡'
+      const ago = Math.round((Date.now() - new Date(a.fired_at).getTime()) / 60000)
+      return `${icon} ${a.title} (${ago}분 전)`
+    })
+    return { data: { message: `**활성 알람 ${alerts?.length || 0}건**\n🔴 Critical: ${critical.length}건 | 🟡 Warning: ${warning.length}건\n\n${lines.join('\n')}\n\n${critical.length > 0 ? '⚠️ Critical 알람에 즉시 대응이 필요합니다.' : '주의 수준의 알람만 있습니다.'}` } }
+  }
+
+  // 상태/현황/요약
+  if (lower.includes('상태') || lower.includes('현황') || lower.includes('요약') || lower.includes('summary') || lower.includes('전체')) {
+    const { data: summary } = await supabase.rpc('dashboard_summary')
+    const s = summary || { total_assets: 0, normal_count: 0, warning_count: 0, down_count: 0, active_alerts: 0 }
+    const avail = s.total_assets > 0 ? ((s.normal_count / s.total_assets) * 100).toFixed(1) : '0'
+    return { data: { message: `**인프라 현황 요약**\n\n총 자산: ${s.total_assets}개\n✅ 정상: ${s.normal_count}개 (${avail}%)\n⚠️ 경고: ${s.warning_count}개\n🔴 다운: ${s.down_count}개\n\n활성 알람: ${s.active_alerts}건 (Critical ${s.critical_alerts}건)\n\nSLA 가용률: ${avail}% ${Number(avail) < 99.9 ? '⚠️ 목표 99.9% 미달' : '✅ 목표 달성'}` } }
+  }
+
+  // 네트워크/트래픽
+  if (lower.includes('네트워크') || lower.includes('트래픽') || lower.includes('network') || lower.includes('traffic')) {
+    const fiveMinAgo = new Date(Date.now() - 5 * 60_000).toISOString()
+    const { data: netIn } = await supabase.from('metrics').select('asset_id, value').eq('metric_name', 'network_in').gte('time', fiveMinAgo).order('value', { ascending: false }).limit(10)
+    const { data: assets } = await supabase.from('assets').select('id, name')
+    const nameMap = new Map(assets?.map((a) => [a.id, a]) || [])
+    const seen = new Set<string>()
+    const top = (netIn || []).filter((m) => { if (seen.has(m.asset_id)) return false; seen.add(m.asset_id); return true }).slice(0, 5)
+    const lines = top.map((m, i) => `${i + 1}. **${nameMap.get(m.asset_id)?.name}** — ${(m.value / 1000).toFixed(1)} Mbps`)
+    return { data: { message: `**네트워크 인바운드 트래픽 Top 5**\n\n${lines.join('\n')}\n\n네트워크 장비 상태와 트래픽 패턴은 대시보드에서 실시간 확인 가능합니다.` } }
+  }
+
+  // 서버/자산 목록
+  if (lower.includes('서버') || lower.includes('자산') || lower.includes('목록') || lower.includes('asset')) {
+    const { data: assets } = await supabase.from('assets').select('name, asset_type, status, ip_address').order('name')
+    const byType: Record<string, number> = {}
+    const byStatus: Record<string, number> = {}
+    assets?.forEach((a) => { byType[a.asset_type] = (byType[a.asset_type] || 0) + 1; byStatus[a.status] = (byStatus[a.status] || 0) + 1 })
+    const typeLabels: Record<string, string> = { server: '서버', network_device: '네트워크 장비', vm: '가상머신', system: '시스템' }
+    const typeLines = Object.entries(byType).map(([k, v]) => `• ${typeLabels[k] || k}: ${v}대`)
+    return { data: { message: `**자산 현황** (총 ${assets?.length || 0}개)\n\n유형별:\n${typeLines.join('\n')}\n\n상태별:\n• ✅ 정상: ${byStatus.normal || 0}개\n• ⚠️ 경고: ${byStatus.warning || 0}개\n• 🔴 다운: ${byStatus.down || 0}개\n\n자산관리 메뉴에서 상세 정보를 확인할 수 있습니다.` } }
+  }
+
+  // 로그 관련
+  if (lower.includes('로그') || lower.includes('에러') || lower.includes('error') || lower.includes('log')) {
+    const { data: logs } = await supabase.from('log_entries').select('level, message, timestamp, source').order('timestamp', { ascending: false }).limit(10)
+    const errors = logs?.filter((l) => l.level === 'error') || []
+    const warns = logs?.filter((l) => l.level === 'warn') || []
+    const lines = (logs || []).slice(0, 6).map((l) => {
+      const icon = l.level === 'error' ? '🔴' : l.level === 'warn' ? '🟡' : '🔵'
+      const ago = Math.round((Date.now() - new Date(l.timestamp).getTime()) / 60000)
+      return `${icon} [${l.level}] ${l.message.substring(0, 60)} (${ago}분 전)`
+    })
+    return { data: { message: `**최근 로그 현황**\n🔴 Error: ${errors.length}건 | 🟡 Warning: ${warns.length}건\n\n${lines.join('\n')}\n\n로그 메뉴에서 소스별, 레벨별 필터링이 가능합니다.` } }
+  }
+
+  // 도움말 / 기본 응답
   return {
     data: {
-      message: `인프라 현황을 기반으로 답변드리겠습니다.\n\n현재 모니터링 중인 자산 21개 중 정상 16개, 경고 3개, 다운 2개입니다.\n\n더 구체적인 질문을 해주시면 상세한 분석을 제공할 수 있습니다. 예시:\n• "CPU 사용률 높은 서버는?"\n• "현재 장애 상태는?"\n• "디스크 사용량 분석해줘"\n• "활성 알람 현황"`,
+      message: `안녕하세요! INSITE AI 어시스턴트입니다. 실시간 데이터를 기반으로 답변드립니다.\n\n**질문 예시:**\n• "CPU 사용률 높은 서버는?" — 실시간 CPU Top 5\n• "메모리 상태 알려줘" — 메모리 사용률 분석\n• "디스크 현황" — 디스크 사용량 + 포화 예측\n• "현재 장애 상태" — 다운 자산 상세 정보\n• "활성 알람" — 알람 현황 요약\n• "인프라 전체 상태" — 종합 요약\n• "네트워크 트래픽" — 트래픽 Top 5\n• "최근 에러 로그" — 로그 현황\n• "서버 목록" — 자산 유형별 현황`,
     },
   }
 }
